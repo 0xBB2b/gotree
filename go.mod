@@ -1,4 +1,4 @@
-module github.com/0xBB2b/gotree
+module github.com/ne2blink/gotree
 
 go 1.16
 

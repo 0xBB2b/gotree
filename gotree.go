@@ -15,29 +15,29 @@ func Print(path string) {
 	}
 }
 
-func printDirs(path string, n string) error {
+func printDirs(path string, tree string) error {
 	dirs, files, err := readDir(path)
 	if err != nil {
 		return err
 	}
 	for i, dir := range dirs {
 		if len(dirs)-1 == i && len(files) == 0 {
-			fmt.Println(n+"┗━", color.CyanString(dir))
-			if err := printDirs(path+"/"+dir+"/", n+"   "); err != nil {
+			fmt.Println(tree+"┗━", color.CyanString(dir))
+			if err := printDirs(path+"/"+dir+"/", tree+"   "); err != nil {
 				return err
 			}
 		} else {
-			fmt.Println(n+"┣━", color.CyanString(dir))
-			if err := printDirs(path+"/"+dir+"/", n+"┃  "); err != nil {
+			fmt.Println(tree+"┣━", color.CyanString(dir))
+			if err := printDirs(path+"/"+dir+"/", tree+"┃  "); err != nil {
 				return err
 			}
 		}
 	}
 	for i, file := range files {
 		if len(files)-1 == i {
-			color.White(n + "┗━ " + file)
+			color.White(tree + "┗━ " + file)
 		} else {
-			color.White(n + "┣━ " + file)
+			color.White(tree + "┣━ " + file)
 		}
 	}
 	return nil

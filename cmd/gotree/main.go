@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/0xBB2b/gotree"
+	"github.com/ne2blink/gotree"
 )
 
 func main() {
