@@ -15,8 +15,8 @@ type FileType uint
 
 const (
 	Folder FileType = iota + 1
-	File
-	Tar
+	GeneralFile
+	TarFile
 )
 
 const (
@@ -25,10 +25,10 @@ const (
 	tarColor    = color.FgMagenta
 )
 
-type URI struct {
-	lv   int
-	typ  FileType
-	name string
+type FileTree struct {
+	level    int
+	fileType FileType
+	name     string
 }
 
 func Print(path string) {
@@ -43,73 +43,78 @@ func printDirs(path string) error {
 	if err != nil {
 		return err
 	}
-	var tree []string
+	var tabArray []string
 	for index, uri := range list {
 		tab := ""
 		isLast := true
+		// 判断是否为当前文件将中最后一个
 		for i := index + 1; i < len(list); i++ {
-			if list[i].lv < list[index].lv {
+			if list[i].level < list[index].level {
 				break
 			}
-			if list[i].lv == list[index].lv {
+			if list[i].level == list[index].level {
 				isLast = false
 				break
 			}
 		}
-		if index > 0 && len(tree) > 0 && list[index-1].lv > list[index].lv {
-			tree = tree[:uri.lv]
+		// 删除多余的制表符
+		if index > 0 && len(tabArray) > 0 && list[index-1].level > list[index].level {
+			tabArray = tabArray[:uri.level]
 		}
-		if isLast && uri.typ != File {
-			if len(tree) == uri.lv {
-				tree = append(tree, "  ")
+		// 添加对应的制表符
+		if isLast && uri.fileType != GeneralFile {
+			if len(tabArray) == uri.level {
+				tabArray = append(tabArray, "  ")
 			}
-		} else if uri.typ != File {
-			if len(tree) == uri.lv {
-				tree = append(tree, "┃ ")
+		} else if uri.fileType != GeneralFile {
+			if len(tabArray) == uri.level {
+				tabArray = append(tabArray, "┃ ")
 			}
 		}
-		for i := 0; i < uri.lv; i++ {
-			tab = tab + tree[i]
+		for i := 0; i < uri.level; i++ {
+			tab = tab + tabArray[i]
 		}
-		if index == len(list)-1 || list[index].lv > list[index+1].lv || isLast {
+		if index == len(list)-1 || list[index].level > list[index+1].level || isLast {
 			tab = tab + "┗━"
 		} else {
 			tab = tab + "┣━"
 		}
-		fmt.Println(tab + print(uri.typ)(uri.name))
+		fmt.Println(tab + print(uri.fileType)(uri.name))
 	}
 	return nil
 }
 
-func readDir(path string, lv int) ([]URI, error) {
-	var list []URI
+// 读取目录
+func readDir(path string, level int) ([]FileTree, error) {
+	var list []FileTree
 	dir, err := ioutil.ReadDir(path)
 	if err != nil {
 		return list, err
 	}
 	for _, fi := range dir {
 		if fi.IsDir() {
-			list = append(list, URI{lv, Folder, fi.Name()})
-			l, err := readDir(path+"/"+fi.Name(), lv+1)
+			list = append(list, FileTree{level, Folder, fi.Name()})
+			l, err := readDir(path+"/"+fi.Name(), level+1)
 			if err != nil {
 				return list, err
 			}
 			list = append(list, l...)
 		} else if strings.HasSuffix(fi.Name(), ".tar") {
-			list = append(list, URI{lv, Tar, fi.Name()})
-			tars, err := readTar(path+"/"+fi.Name(), lv)
+			list = append(list, FileTree{level, TarFile, fi.Name()})
+			tars, err := readTar(path+"/"+fi.Name(), level)
 			if err != nil {
 				return list, err
 			}
 			list = append(list, tars...)
 		} else {
-			list = append(list, URI{lv, File, fi.Name()})
+			list = append(list, FileTree{level, GeneralFile, fi.Name()})
 		}
 	}
 	return list, err
 }
 
-func readTar(path string, lv int) (list []URI, err error) {
+// 读取tar文件
+func readTar(path string, level int) (list []FileTree, err error) {
 	reader, err := os.Open(path)
 	if err != nil {
 		return
@@ -126,23 +131,24 @@ func readTar(path string, lv int) (list []URI, err error) {
 			return
 		}
 
-		fi := header.FileInfo()
-		tp := File
-		l := len(strings.Split(header.Name, "/")) + lv
+		fileInfo := header.FileInfo()
+		fileType := GeneralFile
+		lv := len(strings.Split(header.Name, "/")) + level
 		if strings.HasSuffix(header.Name, "/") {
-			tp = Folder
-			l = l - 1
+			fileType = Folder
+			lv = lv - 1
 		}
-		list = append(list, URI{l, tp, fi.Name()})
+		list = append(list, FileTree{lv, fileType, fileInfo.Name()})
 	}
 	return
 }
 
+// 打印对应的颜色
 func print(filrType FileType) func(a ...interface{}) string {
 	switch filrType {
 	case Folder:
 		return color.New(folderColor).SprintFunc()
-	case Tar:
+	case TarFile:
 		return color.New(tarColor).SprintFunc()
 	default:
 		return color.New(fileColor).SprintFunc()
