@@ -20,127 +20,112 @@ const (
 )
 
 const (
+	tab0        = "  "
+	tab1        = "┃ "
+	tab2        = "┗━"
+	tab3        = "┣━"
 	folderColor = color.FgCyan
 	fileColor   = color.FgWhite
 	tarColor    = color.FgMagenta
 )
 
-type FileTree struct {
-	level    int      // 层级
-	fileType FileType // 类型
-	name     string   // 名称
-}
-
 func Print(path string) {
-	if err := printDirs(path); err != nil {
+	if err := printDirs(path, ""); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func printDirs(path string) error {
-	files, err := readDir(path, 0)
+func printDirs(path string, tab string) error {
+	dirs, files, err := readDir(path)
 	if err != nil {
 		return err
 	}
-	var tabArray []string
-	for index, file := range files {
-		tab := ""
-		isLast := true
-		// 判断是否为当前文件夹中最后一个
-		for i := index + 1; i < len(files); i++ {
-			if files[i].level < files[index].level {
-				break
+	for index, dir := range dirs {
+		if index == len(dirs)-1 && len(files) == 0 {
+			fmt.Println(tab + tab2 + print(Folder)(dir))
+			nextPath := path + "/" + dir
+			if err := printDirs(nextPath, tab+tab0); err != nil {
+				return err
 			}
-			if files[i].level == files[index].level {
-				isLast = false
-				break
-			}
-		}
-		// 删除多余的制表符
-		if index > 0 && len(tabArray) > 0 && files[index-1].level > files[index].level {
-			tabArray = tabArray[:file.level]
-		}
-		// 添加对应的制表符
-		if isLast && file.fileType != GeneralFile {
-			if len(tabArray) == file.level {
-				tabArray = append(tabArray, "  ")
-			}
-		} else if file.fileType != GeneralFile {
-			if len(tabArray) == file.level {
-				tabArray = append(tabArray, "┃ ")
-			}
-		}
-		for i := 0; i < file.level; i++ {
-			tab = tab + tabArray[i]
-		}
-		if index == len(files)-1 || files[index].level > files[index+1].level || isLast {
-			tab = tab + "┗━"
 		} else {
-			tab = tab + "┣━"
+			fmt.Println(tab + tab3 + print(Folder)(dir))
+			nextPath := path + "/" + dir
+			if err := printDirs(nextPath, tab+tab1); err != nil {
+				return err
+			}
 		}
-		fmt.Println(tab + print(file.fileType)(file.name))
 	}
+	for index, file := range files {
+		if strings.HasSuffix(file, ".tar") {
+			if index == len(files)-1 {
+				fmt.Println(tab + tab2 + print(TarFile)(file))
+				nextPath := path + "/" + file
+				if err := printTar(nextPath, tab+tab0); err != nil {
+					return err
+				}
+			} else {
+				fmt.Println(tab + tab3 + print(TarFile)(file))
+				nextPath := path + "/" + file
+				if err := printTar(nextPath, tab+tab1); err != nil {
+					return err
+				}
+			}
+		} else {
+			if index == len(files)-1 {
+				fmt.Println(tab + tab2 + print(GeneralFile)(file))
+			} else {
+				fmt.Println(tab + tab3 + print(GeneralFile)(file))
+			}
+		}
+	}
+
 	return nil
 }
 
-// 读取目录
-func readDir(path string, level int) ([]FileTree, error) {
-	var files []FileTree
-	dir, err := ioutil.ReadDir(path)
-	if err != nil {
-		return files, err
-	}
-	for _, fi := range dir {
-		if fi.IsDir() {
-			files = append(files, FileTree{level, Folder, fi.Name()})
-			fs, err := readDir(path+"/"+fi.Name(), level+1)
-			if err != nil {
-				return files, err
-			}
-			files = append(files, fs...)
-		} else if strings.HasSuffix(fi.Name(), ".tar") {
-			files = append(files, FileTree{level, TarFile, fi.Name()})
-			tars, err := readTar(path+"/"+fi.Name(), level)
-			if err != nil {
-				return files, err
-			}
-			files = append(files, tars...)
-		} else {
-			files = append(files, FileTree{level, GeneralFile, fi.Name()})
-		}
-	}
-	return files, err
-}
-
-// 读取tar文件
-func readTar(path string, level int) ([]FileTree, error) {
-	var files []FileTree
+func printTar(path string, tab string) error {
 	reader, err := os.Open(path)
 	if err != nil {
-		return files, err
+		return err
 	}
 	defer reader.Close()
 
 	tarReader := tar.NewReader(reader)
+	var headerNames []string
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return files, err
+			return err
 		}
 
-		fileInfo := header.FileInfo()
-		fileType := GeneralFile
-		lv := len(strings.Split(header.Name, "/")) + level
-		if strings.HasSuffix(header.Name, "/") {
-			fileType = Folder
-			lv = lv - 1
-		}
-		files = append(files, FileTree{lv, fileType, fileInfo.Name()})
+		headerNames = append(headerNames, header.Name)
 	}
-	return files, err
+	for index, headerName := range headerNames {
+		if index == len(headerNames)-1 {
+			fmt.Println(tab + tab2 + print(GeneralFile)(headerName))
+		} else {
+			fmt.Println(tab + tab3 + print(GeneralFile)(headerName))
+		}
+	}
+	return nil
+}
+
+// 读取目录
+func readDir(path string) (dirs, flies []string, err error) {
+	dir, err := ioutil.ReadDir(path)
+	if err != nil {
+		return
+	}
+	for _, fi := range dir {
+		if fi.IsDir() {
+			dirs = append(dirs, fi.Name())
+		} else {
+			flies = append(flies, fi.Name())
+		}
+	}
+	return
 }
 
 // 打印对应的颜色
